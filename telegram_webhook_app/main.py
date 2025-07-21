@@ -1,4 +1,11 @@
 from flask import Flask, request
+from dotenv import load_dotenv
+import os
+
+load_dotenv()  
+
+TELEGRAM_TOKEN = os.getenv("BOT_TOKEN") 
+
 
 app = Flask(__name__)
 
