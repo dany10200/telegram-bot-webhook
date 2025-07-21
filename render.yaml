@@ -3,5 +3,5 @@ services:
     name: telegram-webhook
     env: python
     plan: free
-    buildCommand: "pip install -r telegram_webhook_app/requirements.txt"
+    buildCommand: "pip install -r requirements.txt"
     startCommand: "gunicorn telegram_webhook_app.main:app"
