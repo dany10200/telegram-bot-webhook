@@ -1,34 +1,27 @@
-from flask import Flask, request
-import telegram
+from telegram import Update
+from telegram.ext import (
+    ApplicationBuilder,
+    ContextTypes,
+    CommandHandler
+)
 import os
+from dotenv import load_dotenv
 
-TOKEN = os.getenv("BOT_TOKEN")
-bot = telegram.Bot(token=TOKEN)
+load_dotenv()
 
-app = Flask(__name__)
+BOT_TOKEN = os.getenv("BOT_TOKEN")  # تأكد إن التوكن في ملف .env
 
-@app.route("/")
-def home():
-    return "Bot is live!"
+# أمر البدء
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("مرحبًا بك في البوت!")
 
-@app.route("/webhook", methods=["POST"])
-def webhook():
-    data = request.get_json()
-    print("Webhook data:", data)
+# أنشئ التطبيق
+app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    if "message" in data:
-        chat_id = data["message"]["chat"]["id"]
-        text = data["message"].get("text", "")
+# أضف الأمر start
+app.add_handler(CommandHandler("start", start))
 
-        if text == "/start":
-            bot.send_message(chat_id=chat_id, text="هلا! أنا بوت PowerX. كيف أقدر أساعدك؟")
-        elif "السعر" in text or "بكم" in text:
-            bot.send_message(chat_id=chat_id, text="الباقة الأساسية تبدأ من ١٠٠ ريال. تبغى التفاصيل؟")
-        else:
-            bot.send_message(chat_id=chat_id, text="ما فهمتك تمام، جرب تكتب /start")
-
-    return "OK", 200
-
+# ابدأ البوت باستخدام polling
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    print("Bot is running...")
+    app.run_polling()
