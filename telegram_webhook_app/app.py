@@ -6,51 +6,40 @@ from flask import Flask, request
 from telegram import Update
 from telegram.ext import Application, ApplicationBuilder, CommandHandler, ContextTypes
 
-# تحميل متغيرات البيئة
+# تحميل المتغيرات من .env
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-TELEGRAM_TOKEN = BOT_TOKEN  # لتستخدمه في send_message()
 
 # إعداد تطبيق Telegram
 application = ApplicationBuilder().token(BOT_TOKEN).build()
 
-# إعداد تطبيق Flask
+# Flask app
 flask_app = Flask(__name__)
 
 # أمر /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("✅ مرحبًا بك في PowerX! البوت شغال تمام 🔥")
+    await update.message.reply_text("✅ مرحبًا بك! البوت شغال بنجاح عبر Webhook.")
 
-# إضافة الأمر للبوت
+# أضف الأمر
 application.add_handler(CommandHandler("start", start))
 
-# نقطة Webhook
+# Webhook endpoint
 @flask_app.route("/webhook", methods=["POST"])
 def webhook():
     data = request.get_json(force=True)
     update = Update.de_json(data, application.bot)
 
-    async def process():
-        if not application.initialized:
-            await application.initialize()
+    async def process_update():
+        await application.initialize()   # بدون أي شرط
         await application.process_update(update)
 
-    asyncio.run(process())
+    asyncio.run(process_update())
     return "ok", 200
 
-# (اختياري) نقطة لجلب معلومات أساسية للتجربة
+# صفحة رئيسية بسيطة
 @flask_app.route("/", methods=["GET"])
-def index():
-    return "✅ PowerX Telegram Webhook Bot is Live", 200
+def home():
+    return "✅ Webhook Bot is Live", 200
 
-# دالة إرسال رسالة (يمكنك استخدامها لأي غرض يدوي)
-def send_message(chat_id, text):
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": chat_id,
-        "text": text
-    }
-    requests.post(url, json=payload)
-
-# تعريف المتغير المطلوب لـ gunicorn
+# تعريف متغير Gunicorn
 app = flask_app
