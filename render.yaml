@@ -2,7 +2,10 @@ services:
   - type: web
     name: telegram-bot-webhook
     env: python
-    pythonVersion: 3.11.9     # ✅ أضف هذا السطر
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn main:app
-    autoDeploy: true
+    startCommand: gunicorn app:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:10000
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        value: 7416748927:AAHjFFLI2UTLYrcjwH5dzIPkvQSDz1k3yFc
+      - key: OPENAI_API_KEY
+        value: sk-xxx-xxx
