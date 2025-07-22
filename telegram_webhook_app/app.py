@@ -1,29 +1,23 @@
 from flask import Flask, request
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
-import os
-import asyncio
 from dotenv import load_dotenv
-import requests
+import os
 import openai
+import requests
 
+# تحميل المتغيرات
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")  # لازم يكون محفوظ في .env
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 openai.api_key = OPENAI_API_KEY
 
-application = ApplicationBuilder().token(BOT_TOKEN).build()
-flask_app = Flask(__name__)
-app = flask_app  # لـ Gunicorn
+app = Flask(__name__)  # Gunicorn uses this
 
-# أمر /start
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("مرحبًا بك! البوت شغال عبر Webhook ✅")
+def send_message(chat_id, text):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    payload = {"chat_id": chat_id, "text": text}
+    requests.post(url, json=payload)
 
-application.add_handler(CommandHandler("start", start))
-
-# ردود محفوظة
 def get_saved_reply(text):
     text = text.lower()
     if "الباقات" in text:
@@ -36,11 +30,10 @@ def get_saved_reply(text):
         return "🕐 من 1 ظهرًا إلى 10 مساءً يوميًا."
     return None
 
-# دالة استدعاء GPT
 def get_gpt_response(user_message):
     try:
         response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",  # أو gpt-4 إذا توفر
+            model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "أنت مساعد افتراضي لخدمة PowerX للسيارات. رد باحتراف وبلغة واضحة باللهجة السعودية."},
                 {"role": "user", "content": user_message}
@@ -52,7 +45,6 @@ def get_gpt_response(user_message):
     except Exception as e:
         return "❌ حدث خطأ في الاتصال بـ GPT."
 
-# Webhook
 @app.route("/webhook", methods=["POST"])
 def webhook():
     data = request.get_json()
@@ -60,16 +52,18 @@ def webhook():
         chat_id = data["message"]["chat"]["id"]
         text = data["message"].get("text", "")
 
-        saved_reply = get_saved_reply(text)
-        if saved_reply:
-            send_message(chat_id, saved_reply)
+        if text.startswith("/start"):
+            send_message(chat_id, "مرحبًا بك! البوت شغال عبر Webhook ✅")
         else:
-            gpt_reply = get_gpt_response(text)
-            send_message(chat_id, gpt_reply)
+            saved_reply = get_saved_reply(text)
+            if saved_reply:
+                send_message(chat_id, saved_reply)
+            else:
+                gpt_reply = get_gpt_response(text)
+                send_message(chat_id, gpt_reply)
 
     return "ok", 200
 
-def send_message(chat_id, text):
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": chat_id, "text": text}
-    requests.post(url, json=payload)
+@app.route("/", methods=["GET"])
+def index():
+    return "بوت PowerX يعمل ✅", 200
