@@ -1,40 +1,36 @@
 from fastapi import FastAPI, Request
-import os
 import httpx
+import os
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv()  # تحميل متغيرات البيئة من .env
 
 app = FastAPI()
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-OPENAI_KEY = os.getenv("OPENAI_API_KEY")
-TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-
-@app.get("/")
-def root():
-    return {"status": "running"}
+PRESET_REPLIES = {
+    "مواعيد العمل": "من 9 صباحًا إلى 5 مساءً، ما عدا الجمعة.",
+    "فين الموقع": "الدمام، حي الزهور.",
+    "الأسعار": "الباقة تبدأ من 199 ريال وتشمل الحماية والتلميع الكامل.",
+}
 
 @app.post("/webhook")
-async def telegram_webhook(req: Request):
+async def webhook_handler(req: Request):
     data = await req.json()
+    message = data.get("message", {})
+    chat_id = message.get("chat", {}).get("id")
+    text = message.get("text", "").strip()
 
-    try:
-        message = data["message"]["text"]
-        chat_id = data["message"]["chat"]["id"]
+    if not chat_id or not text:
+        return {"ok": True}
 
-        # رد بسيط + ممكن تربطه بـ GPT لو عايز
-        reply = f"إنت قلت: {message}"
+    reply = PRESET_REPLIES.get(text, "اسألني أي شيء عن خدماتنا!")
 
-        async with httpx.AsyncClient() as client:
-            await client.post(TELEGRAM_API_URL, json={
-                "chat_id": chat_id,
-                "text": reply
-            })
-
-    except Exception as e:
-        print("Error handling message:", e)
+    async with httpx.AsyncClient() as client:
+        await client.post(TELEGRAM_API, json={
+            "chat_id": chat_id,
+            "text": reply
+        })
 
     return {"ok": True}
-
-# احذف app.run()
