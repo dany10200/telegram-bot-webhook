@@ -1,7 +1,5 @@
+python-telegram-bot==20.7
+openai>=1.0.0
 flask
 python-dotenv
-gunicorn
-python-telegram-bot==20.3
 requests
-openai==0.28
-
