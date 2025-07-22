@@ -29,3 +29,27 @@ def webhook():
 
 # This variable must be called `app` for Gunicorn to load it
 app = flask_app
+import requests
+
+@app.route("/webhook", methods=["POST"])
+def webhook():
+    data = request.json
+    print("Received data:", data)
+
+    # استخراج الرسالة والنص
+    if "message" in data:
+        chat_id = data["message"]["chat"]["id"]
+        text = data["message"].get("text", "")
+
+        if text == "/start":
+            send_message(chat_id, "✅ مرحبًا بك في PowerX! البوت شغال تمام 🔥")
+
+    return "ok", 200
+
+def send_message(chat_id, text):
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": text
+    }
+    requests.post(url, json=payload)
