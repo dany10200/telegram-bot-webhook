@@ -1,47 +1,64 @@
 import os
 from flask import Flask, request
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import (
+    ApplicationBuilder,
+    ContextTypes,
+    CommandHandler,
+)
+
 from openai import OpenAI
 
-# استدعاء API key من environment variables
-openai_api_key = os.getenv("OPENAI_API_KEY")
-if not openai_api_key:
+# تأكد من وجود المتغير في البيئة
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY is not set in environment variables.")
 
-# تهيئة OpenAI client
-client = OpenAI(api_key=openai_api_key)
+client = OpenAI(api_key=OPENAI_API_KEY)
 
-# تهيئة Flask app
 app = Flask(__name__)
 
-# أمر /start في البوت
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("أهلاً بك! أرسل أي رسالة وسأرد عليك باستخدام GPT.")
+TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+if not TOKEN:
+    raise ValueError("TELEGRAM_BOT_TOKEN is not set in environment variables.")
 
-# أمر للرد على أي رسالة
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_input = update.message.text
+bot_app = ApplicationBuilder().token(TOKEN).build()
+
+
+# أمر بدء المحادثة
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("أهلاً! أنا بوت الذكاء الاصطناعي. أرسل أي سؤال.")
+
+# أمر gpt لرد ذكي
+async def gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    prompt = " ".join(context.args)
+    if not prompt:
+        await update.message.reply_text("يرجى كتابة سؤال بعد الأمر /gpt")
+        return
+
     response = client.chat.completions.create(
         model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": user_input}]
+        messages=[{"role": "user", "content": prompt}],
     )
+
     reply = response.choices[0].message.content
     await update.message.reply_text(reply)
 
-# إنشاء تطبيق التليجرام
-application = ApplicationBuilder().token(os.getenv("BOT_TOKEN")).build()
-application.add_handler(CommandHandler("start", start))
-application.add_handler(CommandHandler("chat", handle_message))
+# تسجيل الأوامر
+bot_app.add_handler(CommandHandler("start", start))
+bot_app.add_handler(CommandHandler("gpt", gpt))
 
-# نقطة البداية لـ webhook
-@app.route("/", methods=["POST"])
-def webhook():
-    data = request.get_json(force=True)
-    update = Update.de_json(data, application.bot)
-    application.update_queue.put_nowait(update)
-    return "ok"
 
-# تشغيل التطبيق
+# مسار /webhook
+@app.route("/webhook", methods=["POST"])
+async def webhook():
+    if request.method == "POST":
+        await bot_app.update_queue.put(Update.de_json(request.get_json(force=True), bot_app.bot))
+        return "Webhook received!"
+    return "Invalid request", 400
+
+
+# لتشغيله على render
 if __name__ == "__main__":
-    app.run(debug=True)
+    import asyncio
+    bot_app.run_polling()
