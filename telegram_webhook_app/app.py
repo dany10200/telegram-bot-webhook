@@ -38,7 +38,7 @@ def get_saved_reply(text):
         return "العرض يشمل تلميع + حماية + هدية مجانية لأول 10 عملاء."
 
 # استقبال الرسائل من Telegram
-@flask_app.route("/", methods=["POST"])
+@flask_app.route("/webhook", methods=["POST"])
 def webhook():
     data = request.get_json()
     if data:
