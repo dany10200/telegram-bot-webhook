@@ -1,34 +1,22 @@
 from fastapi import FastAPI, Request
-import httpx
+import uvicorn
 import os
-from dotenv import load_dotenv
-
-load_dotenv()  # تحميل متغيرات البيئة من .env
+import requests
 
 app = FastAPI()
+
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+TELEGRAM_API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
-PRESET_REPLIES = {
-    "مواعيد العمل": "من 9 صباحًا إلى 5 مساءً، ما عدا الجمعة.",
-    "فين الموقع": "الدمام، حي الزهور.",
-    "الأسعار": "الباقة تبدأ من 199 ريال وتشمل الحماية والتلميع الكامل.",
-}
-
-@app.post("/webhook")
-async def webhook_handler(req: Request):
+@app.post("/")
+async def telegram_webhook(req: Request):
     data = await req.json()
-    message = data.get("message", {})
-    chat_id = message.get("chat", {}).get("id")
-    text = message.get("text", "").strip()
+    message = data.get("message", {}).get("text", "")
+    chat_id = data.get("message", {}).get("chat", {}).get("id")
 
-    if not chat_id or not text:
-        return {"ok": True}
-
-    reply = PRESET_REPLIES.get(text, "اسألني أي شيء عن خدماتنا!")
-
-    async with httpx.AsyncClient() as client:
-        await client.post(TELEGRAM_API, json={
+    if message and chat_id:
+        reply = "أهلًا! هذا رد تلقائي ✨"
+        requests.post(f"{TELEGRAM_API_URL}/sendMessage", json={
             "chat_id": chat_id,
             "text": reply
         })
