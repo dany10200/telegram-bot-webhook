@@ -5,75 +5,72 @@ import os
 import asyncio
 from dotenv import load_dotenv
 import requests
-from openai import OpenAI
+import openai
 
-# تحميل متغيرات البيئة
 load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# تهيئة GPT client
-client = OpenAI(api_key=OPENAI_API_KEY)
+# عميل GPT الرسمي
+client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
-# تهيئة البوت
 application = ApplicationBuilder().token(BOT_TOKEN).build()
 flask_app = Flask(__name__)
 app = flask_app  # لـ Gunicorn
 
-# أمر /start
+# /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("✅ أهلاً! البوت شغال عبر Webhook 🔌")
+    await update.message.reply_text("مرحبا! البوت شغال ✅ Webhook 🎯")
 
 application.add_handler(CommandHandler("start", start))
 
-# رد محفوظ
+
+# ردود محفوظة
 def get_saved_reply(text):
     text = text.lower()
     if "الباقة" in text:
-        return "💎 رجاءً أرسل: التلميع الشامل – VIP – الحماية، وسنرد عليك بالتفاصيل."
-    elif "سعر" in text or "السعر" in text:
-        return "💰 الأسعار تبدأ من 250 ريال حسب نوع السيارة والخدمة."
+        return "رش الحماية الشاملة يتضمن 👇:\n- الفئة: VIP\n- الشفافية: لمعة أو مطفي\n- السعر يبدأ من 1250 ريال"
+    elif "السعر" in text or "كم" in text:
+        return "الأسعار تبدأ من 250 ريال حسب نوع السيارة والمكان 👇"
     elif "الموقع" in text:
-        return "📍 العنوان: https://maps.google.com/"
-    elif "الخدمة" in text:
-        return "🛠️ نقدم: تلميع خارجي – داخلي – حماية نانو – عزل حراري."
+        return "📍 موقعنا على الخريطة: https://maps.google.com/"
+    elif "الحجز" in text:
+        return "للحجز أرسل بيانات السيارة ورقم الجوال وسنتواصل معك."
+
     return None
 
-# معالجة الرسائل
+
 @flask_app.route('/webhook', methods=['POST'])
 def webhook():
     data = request.get_json()
-    if 'message' in data and 'text' in data['message']:
-        user_text = data['message']['text']
-        chat_id = data['message']['chat']['id']
+    if "message" in data:
+        chat_id = data["message"]["chat"]["id"]
+        text = data["message"].get("text", "")
 
-        saved_reply = get_saved_reply(user_text)
-        if saved_reply:
-            send_message(chat_id, saved_reply)
+        reply = get_saved_reply(text)
+        if reply:
+            send_message(chat_id, reply)
         else:
-            # استخدام GPT فقط إذا ما في رد محفوظ
             try:
-                response = client.chat.completions.create(
+                # استخدام GPT للردود العامة
+                completion = client.chat.completions.create(
                     model="gpt-3.5-turbo",
                     messages=[
-                        {"role": "system", "content": "أجب باللهجة السعودية باختصار وسطرين فقط."},
-                        {"role": "user", "content": user_text}
+                        {"role": "system", "content": "أنت بوت دعم ذكي لشركة حماية سيارات."},
+                        {"role": "user", "content": text}
                     ]
                 )
-                answer = response.choices[0].message.content.strip()
-                send_message(chat_id, answer)
+                response = completion.choices[0].message.content.strip()
+                send_message(chat_id, response)
             except Exception as e:
-                print("🔥 GPT Error:", e)
+                print("GPT Error:", e)
                 send_message(chat_id, "❌ حدث خطأ في الاتصال بـ GPT.")
 
-    return "ok"
+    return "OK"
 
-# إرسال رسالة لتليجرام
+
 def send_message(chat_id, text):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     payload = {"chat_id": chat_id, "text": text}
-    try:
-        requests.post(url, json=payload)
-    except Exception as e:
-        print("Telegram Error:", e)
+    requests.post(url, json=payload)
