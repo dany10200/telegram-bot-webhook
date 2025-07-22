@@ -1,8 +1,6 @@
 services:
   - type: web
     name: telegram-bot-webhook
-    env: python
+    runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:10000
-    envVars:
-
+    startCommand: gunicorn app:app
