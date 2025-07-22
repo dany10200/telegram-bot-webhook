@@ -4,50 +4,40 @@ from telegram.ext import Application, ApplicationBuilder, CommandHandler
 import os
 from dotenv import load_dotenv
 import asyncio
+import requests
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-# Telegram bot
 application = ApplicationBuilder().token(BOT_TOKEN).build()
-
-# Flask app
 flask_app = Flask(__name__)
+app = flask_app  # for Gunicorn
 
-# Telegram command
 async def start(update: Update, context):
     await update.message.reply_text("مرحبًا! البوت شغال عبر Webhook ✨")
 
 application.add_handler(CommandHandler("start", start))
 
-# Webhook endpoint
-@flask_app.route("/", methods=["POST"])
-def webhook():
-    update = Update.de_json(request.get_json(force=True), application.bot)
-    asyncio.run(application.process_update(update))
-    return "ok"
-
-# This variable must be called `app` for Gunicorn to load it
-app = flask_app
-import requests
-
+# Webhook endpoint - فقط واحدة
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    data = request.json
-    print("Received data:", data)
+    json_data = request.get_json(force=True)
+    
+    # Telegram built-in processing
+    update = Update.de_json(json_data, application.bot)
+    asyncio.run(application.process_update(update))
 
-    # استخراج الرسالة والنص
-    if "message" in data:
-        chat_id = data["message"]["chat"]["id"]
-        text = data["message"].get("text", "")
-
+    # استخراج يدوي للرسالة (اختياري)
+    if "message" in json_data:
+        chat_id = json_data["message"]["chat"]["id"]
+        text = json_data["message"].get("text", "")
         if text == "/start":
             send_message(chat_id, "✅ مرحبًا بك في PowerX! البوت شغال تمام 🔥")
 
     return "ok", 200
 
 def send_message(chat_id, text):
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     payload = {
         "chat_id": chat_id,
         "text": text
