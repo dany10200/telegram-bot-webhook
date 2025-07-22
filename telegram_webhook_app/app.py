@@ -1,74 +1,71 @@
 from flask import Flask, request
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from openai import OpenAI
 import os
-import asyncio
-from dotenv import load_dotenv
 import requests
-import openai
+from dotenv import load_dotenv
 
 load_dotenv()
-
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# عميل GPT الرسمي
-client = openai.OpenAI(api_key=OPENAI_API_KEY)
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 application = ApplicationBuilder().token(BOT_TOKEN).build()
 flask_app = Flask(__name__)
-app = flask_app  # لـ Gunicorn
+app = flask_app  # للـ gunicorn
 
-# /start
+# أمر /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("مرحبا! البوت شغال ✅ Webhook 🎯")
+    await update.message.reply_text("مرحبًا بك! البوت شغال عبر Webhook ✅")
 
 application.add_handler(CommandHandler("start", start))
-
 
 # ردود محفوظة
 def get_saved_reply(text):
     text = text.lower()
-    if "الباقة" in text:
-        return "رش الحماية الشاملة يتضمن 👇:\n- الفئة: VIP\n- الشفافية: لمعة أو مطفي\n- السعر يبدأ من 1250 ريال"
-    elif "السعر" in text or "كم" in text:
-        return "الأسعار تبدأ من 250 ريال حسب نوع السيارة والمكان 👇"
-    elif "الموقع" in text:
-        return "📍 موقعنا على الخريطة: https://maps.google.com/"
-    elif "الحجز" in text:
-        return "للحجز أرسل بيانات السيارة ورقم الجوال وسنتواصل معك."
-
+    if "الباقات" in text:
+        return "💼 الباقات: باقة أساسية – VIP – رجال أعمال. للتفاصيل راسلنا."
+    elif "السعر" in text or "الأسعار" in text:
+        return "💰 الأسعار تبدأ من 250 ريال حسب نوع السيارة والخدمة."
+    elif "الموقع" in text or "العنوان" in text:
+        return "📍 الدمام – حي الزهور\nرابط: https://maps.google.com/"
+    elif "مواعيد" in text or "العمل" in text:
+        return "🕐 من 1 ظهرًا إلى 10 مساءً يوميًا."
     return None
 
+# دالة استدعاء GPT
+def get_gpt_response(user_message):
+    try:
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "أنت مساعد افتراضي لخدمة PowerX للسيارات. رد باحتراف وبلغة واضحة باللهجة السعودية."},
+                {"role": "user", "content": user_message}
+            ],
+            max_tokens=150,
+            temperature=0.7
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return "❌ حدث خطأ في الاتصال بـ GPT."
 
-@flask_app.route('/webhook', methods=['POST'])
+@app.route("/webhook", methods=["POST"])
 def webhook():
     data = request.get_json()
     if "message" in data:
         chat_id = data["message"]["chat"]["id"]
         text = data["message"].get("text", "")
 
-        reply = get_saved_reply(text)
-        if reply:
-            send_message(chat_id, reply)
+        saved_reply = get_saved_reply(text)
+        if saved_reply:
+            send_message(chat_id, saved_reply)
         else:
-            try:
-                # استخدام GPT للردود العامة
-                completion = client.chat.completions.create(
-                    model="gpt-3.5-turbo",
-                    messages=[
-                        {"role": "system", "content": "أنت بوت دعم ذكي لشركة حماية سيارات."},
-                        {"role": "user", "content": text}
-                    ]
-                )
-                response = completion.choices[0].message.content.strip()
-                send_message(chat_id, response)
-            except Exception as e:
-                print("GPT Error:", e)
-                send_message(chat_id, "❌ حدث خطأ في الاتصال بـ GPT.")
+            gpt_reply = get_gpt_response(text)
+            send_message(chat_id, gpt_reply)
 
-    return "OK"
-
+    return "ok", 200
 
 def send_message(chat_id, text):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
