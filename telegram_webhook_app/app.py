@@ -1,38 +1,24 @@
-from flask import Flask, request
-from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
-
+from fastapi import FastAPI, Request
+import httpx
 import os
-import openai
 
-# تأكد إنك استوردت التحديث
-from telegram.ext import Dispatcher, MessageHandler, filters
+app = FastAPI()
 
-app = Flask(__name__)
+BOT_TOKEN = os.getenv("BOT_TOKEN")  # خزن التوكن من .env
 
-TELEGRAM_TOKEN = os.environ.get("BOT_TOKEN")
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-openai.api_key = OPENAI_API_KEY
+@app.post("/webhook")
+async def telegram_webhook(request: Request):
+    data = await request.json()
+    
+    # اختبر إن فيه رسالة داخلة فعلًا
+    if "message" in data:
+        chat_id = data["message"]["chat"]["id"]
+        text = "تم استلام رسالتك ✅"
+        
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                json={"chat_id": chat_id, "text": text}
+            )
 
-# بوت تليجرام
-telegram_app = Application.builder().token(TELEGRAM_TOKEN).build()
-
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    update = Update.de_json(request.get_json(force=True), telegram_app.bot)
-    telegram_app.update_queue.put(update)
-    return "ok", 200
-
-# نقطة انطلاق بسيطة للتأكد من أن السيرفر شغال
-@app.route('/', methods=['GET'])
-def index():
-    return 'Telegram bot is running!', 200
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("أهلًا! أنا شغال.")
-
-telegram_app.add_handler(CommandHandler('start', start))
-
-# لا تنسَ run_app
-if __name__ == "__main__":
-    telegram_app.run_polling()
+    return {"ok": True}
