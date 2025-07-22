@@ -26,6 +26,3 @@ def send_message(chat_id, text):
         "text": text
     }
     requests.post(url, json=payload)
-
-if __name__ == "__main__":
-    app.run()
