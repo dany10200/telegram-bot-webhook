@@ -1,50 +1,55 @@
 from flask import Flask, request
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram import Update
+from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler
+from openai import OpenAI
 import os
 from dotenv import load_dotenv
-import openai
 
-# تحميل متغيرات البيئة
 load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# إعداد مفتاح OpenAI
-openai.api_key = OPENAI_API_KEY
+client = OpenAI(api_key=OPENAI_API_KEY)
 
-# تهيئة تطبيق Telegram
+app = Flask(__name__)
 application = ApplicationBuilder().token(BOT_TOKEN).build()
-flask_app = Flask(__name__)
-app = flask_app  # مطلوب لـ Gunicorn
 
 # أمر /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("✅ Webhook جاهز الآن بوتك شغال 🎯")
+    await update.message.reply_text("✅ Webhook شغال تمام، أهلاً بيك!")
 
-application.add_handler(CommandHandler("start", start))
-
-# ردود محفوظة
+# الرد الذكي بناءً على المحتوى
 def get_saved_reply(text):
     text = text.lower()
-    if "الباقة" in text:
-        return "رجعنا أقوى.. التلميع شامل – VIP – الباقة كاملة بـ ٥٠٠ ريال."
-    elif "السعر" in text or "تكلفة" in text:
-        return "الأسعار تبدأ من 250 ريال حسب نوع البوية والخدمة."
-    elif "الموقع" in text:
+    if "العنوان" in text:
         return "📍 العنوان: https://maps.google.com/"
-    elif "العرض" in text:
-        return "العرض يشمل تلميع + حماية + هدية مجانية لأول 10 عملاء."
+    elif "الباقة" in text:
+        return "💎 باقة VIP تشمل الغسيل والتلميع والحماية."
+    elif "سعر" in text:
+        return "💰 السعر يبدأ من 250 ريال حسب نوع الخدمة."
+    else:
+        return "🤖 مرحبًا! كيف أقدر أساعدك؟"
 
-# استقبال الرسائل من Telegram
-@flask_app.route("/webhook", methods=["POST"])
+# رد تلقائي على أي رسالة
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+    reply = get_saved_reply(text)
+    await update.message.reply_text(reply)
+
+application.add_handler(CommandHandler("start", start))
+application.add_handler(CommandHandler("help", start))
+application.add_handler(CommandHandler("webhook", start))
+application.add_handler(CommandHandler("start", start))
+application.add_handler(CommandHandler("home", start))
+
+from telegram.ext import MessageHandler, filters
+application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
+
+# تشغيل مع Flask
+@app.route("/webhook", methods=["POST"])
 def webhook():
-    data = request.get_json()
-    if data:
-        update = Update.de_json(data, application.bot)
-        if update.message:
-            text = update.message.text
-            reply = get_saved_reply(text)
-            if reply:
-                application.bot.send_message(chat_id=update.message.chat_id, text=reply)
-    return "ok"
+    if request.method == "POST":
+        update = Update.de_json(request.get_json(force=True), application.bot)
+        application.update_queue.put_nowait(update)
+        return "ok"
